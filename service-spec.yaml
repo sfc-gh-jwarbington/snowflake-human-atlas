@@ -1,0 +1,18 @@
+spec:
+  containers:
+    - name: human-atlas
+      image: /human_atlas_db/public/human_atlas_repo/human-atlas:latest
+      resources:
+        requests:
+          memory: 256M
+          cpu: 0.5
+        limits:
+          memory: 512M
+          cpu: 1
+      readinessProbe:
+        port: 8080
+        path: /health
+  endpoints:
+    - name: atlas
+      port: 8080
+      public: true
