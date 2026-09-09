@@ -116,32 +116,35 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset}:Props){
   };
 
   if(phase==='start'){
-    const today=getTopToday(5),allTime=getTopAllTime(5);
+    const today=getTopToday(10),allTime=getTopAllTime(10);
     const list=tab==='today'?today:allTime;
-    return <div className="game-overlay glass">
-      <div className="game-title"><Trophy size={28}/><h2>Game Mode</h2></div>
-      <p className="game-subtitle">Test your anatomy knowledge — 5 questions, find structures, answer trivia.</p>
-      <div className="game-difficulty">
-        <span className="game-diff-label">Difficulty</span>
-        <div className="game-diff-buttons">
-          {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map(d=>(
-            <Button key={d} variant="ghost" className={`game-diff-btn ${difficulty===d?'active':''}`} onClick={()=>setDifficulty(d)}>
-              <span>{DIFFICULTY_LABELS[d]}</span>
-              <span className="game-diff-meta">{DIFFICULTY_TIME[d]}s · {DIFFICULTY_MULTIPLIER[d]}x{DIFFICULTY_HINTS[d]>0?` · ${DIFFICULTY_HINTS[d]} hints`:''}</span>
-            </Button>
-          ))}
+    return <div className="game-start-layout">
+      <div className="game-overlay glass">
+        <div className="game-title"><Trophy size={28}/><h2>Game Mode</h2></div>
+        <p className="game-subtitle">Test your anatomy knowledge — 5 questions, find structures, answer trivia.</p>
+        <div className="game-difficulty">
+          <span className="game-diff-label">Difficulty</span>
+          <div className="game-diff-buttons">
+            {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map(d=>(
+              <Button key={d} variant="ghost" className={`game-diff-btn ${difficulty===d?'active':''}`} onClick={()=>setDifficulty(d)}>
+                <span>{DIFFICULTY_LABELS[d]}</span>
+                <span className="game-diff-meta">{DIFFICULTY_TIME[d]}s · {DIFFICULTY_MULTIPLIER[d]}x{DIFFICULTY_HINTS[d]>0?` · ${DIFFICULTY_HINTS[d]} hints`:''}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="game-start-actions">
+          <Button className="game-start-btn" onClick={startGame}><Zap size={16}/>Start Quiz</Button>
+          <Button variant="ghost" className="game-exit-btn" onClick={onExit}>Back to Explorer</Button>
         </div>
       </div>
-      <div className="game-start-actions">
-        <Button className="game-start-btn" onClick={startGame}><Zap size={16}/>Start Quiz</Button>
-        <Button variant="ghost" className="game-exit-btn" onClick={onExit}>Back to Explorer</Button>
-      </div>
-      {(today.length>0||allTime.length>0)&&<>
-        <div className="game-lb-tabs game-lb-tabs-mini">
+      <div className="game-lb-panel glass">
+        <div className="game-title"><Crown size={22}/><h2>Leaderboard</h2></div>
+        <div className="game-lb-tabs">
           <Button variant="ghost" className={tab==='today'?'active':''} onClick={()=>setTab('today')}>Today</Button>
           <Button variant="ghost" className={tab==='alltime'?'active':''} onClick={()=>setTab('alltime')}>All Time</Button>
         </div>
-        {list.length===0?<p className="game-lb-empty">No scores yet.</p>:
+        {list.length===0?<p className="game-lb-empty">No scores yet — be the first!</p>:
         <div className="game-lb-table">
           <div className="game-lb-header"><span>#</span><span>Name</span><span>Score</span><span>Level</span></div>
           {list.map((e,i)=>(
@@ -153,7 +156,7 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset}:Props){
             </div>
           ))}
         </div>}
-      </>}
+      </div>
     </div>;
   }
 
