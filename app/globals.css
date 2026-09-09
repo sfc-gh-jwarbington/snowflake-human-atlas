@@ -245,3 +245,79 @@ h1 .edition{font-family:inherit;font-weight:500;font-size:10px;letter-spacing:.0
  .game-big-score{font-size:44px}
  .game-lb-header,.game-lb-row{grid-template-columns:28px 1fr 60px 80px;font-size:12px}
 }
+
+/* ---- Hint system: flashing system row in the layers panel ---- */
+@keyframes system-flash{
+ 0%,100%{background:transparent;box-shadow:none}
+ 15%,45%,75%{background:color-mix(in srgb,var(--flash-color,#458a85) 22%,transparent);box-shadow:inset 0 0 0 1px var(--flash-color,#458a85)}
+ 30%,60%,90%{background:transparent;box-shadow:none}
+}
+.system-row.flashing{animation:system-flash 3s ease-in-out 1;border-radius:8px}
+.system-row.flashing .system-name{color:#233644;font-weight:600}
+.studio.dark .system-row.flashing .system-name{color:#eef2f6}
+
+/* ---- Wrong-answer penalty indicator ---- */
+@keyframes penalty-float{
+ 0%{opacity:0;transform:translate(-50%,4px) scale(.85)}
+ 20%{opacity:1;transform:translate(-50%,-6px) scale(1.1)}
+ 100%{opacity:0;transform:translate(-50%,-26px) scale(1)}
+}
+.game-penalty{position:absolute;left:50%;top:-2px;font-size:13px;font-weight:700;color:#c05245;pointer-events:none;animation:penalty-float 1.1s ease-out 1 forwards;white-space:nowrap}
+.game-hud-timer{position:relative}
+
+/* ---- Earned (wrong-click) hint ladder ---- */
+.game-earned-hints{display:flex;flex-direction:column;gap:6px}
+.game-earned-hints .game-hint-text{margin:0}
+.game-tier-system-flash{color:#2f6f8f}
+.game-tier-isolate{color:#7a5ea8}
+.game-tier-reveal{color:#a8712f;font-weight:600}
+.studio.dark .game-tier-system-flash{color:#7fc0e0}
+.studio.dark .game-tier-isolate{color:#c0a8e0}
+.studio.dark .game-tier-reveal{color:#e0b87f}
+
+/* ---- Timer escalation: yellow under 33% remaining, pulsing red under 17% ---- */
+.game-hud-timer.warn{color:#b8860b}
+.game-hud-bar-fill.warn{background:#d9a520}
+@keyframes timer-crit{
+ 0%,100%{color:#c05245;transform:scale(1)}
+ 50%{color:#e8503f;transform:scale(1.14)}
+}
+.game-hud-timer.crit{color:#c05245;animation:timer-crit .5s ease-in-out infinite;display:inline-block}
+@keyframes bar-crit{0%,100%{opacity:1}50%{opacity:.45}}
+.game-hud-bar-fill.crit{background:#c05245;animation:bar-crit .5s ease-in-out infinite}
+.studio.dark .game-hud-timer.warn{color:#e8c04a}
+
+/* ---- Systems panel: fit all 15 systems with no scrollbar ----
+   Previously capped at max-height:654px with 35px rows (38px >=1400px), so
+   15 rows + chrome (~151px) overflowed and hid the last three systems.
+   Now the panel is taller, chrome is tighter, and rows scale with viewport
+   height so the full list fits from 800px tall upward. */
+@media(min-width:768px){
+ .layers-panel{top:142px;bottom:88px;max-height:none;padding:10px 14px 0}
+ .layers-panel .panel-heading{font-size:12px}
+ .layers-panel .layer-presets{margin:7px 0 3px}
+ .layers-panel .layer-presets button{height:26px;min-height:26px}
+ /* No gutter reservation: it caused a ~9px phantom horizontal overflow. */
+ /* Without flex-grow the list sat at content height and panel-foot's
+    margin-top:auto swallowed the leftover space, so a few px of sub-pixel
+    row rounding was enough to trigger a scrollbar. Let it fill instead. */
+ .layers-panel .system-list{flex:1 1 auto;min-height:0;padding:0 6px 0 0;overflow-x:hidden;scrollbar-gutter:auto}
+ .layers-panel .panel-foot{margin-top:0}
+ .layers-panel .panel-foot{min-height:26px;font-size:10px}
+ /* Row height is set by the inner Button, so it has to be constrained too. */
+ .layers-panel .system-row{min-height:0;flex:0 0 auto;height:clamp(26px,3.4vh,34px)}
+ .layers-panel .system-name{min-height:0;height:100%;padding-block:0;line-height:1.1}
+ .layers-panel .system-row [data-slot=switch]{flex-shrink:0}
+}
+@media(min-width:1400px){
+ .layers-panel{top:142px;bottom:88px}
+ .layers-panel .system-row{height:clamp(28px,3.4vh,35px)}
+ .layers-panel .system-name{font-size:13px}
+}
+
+/* ---- Leaderboard placement banner & offline note ---- */
+.game-lb-banner{display:flex;align-items:center;gap:8px;margin:0;padding:10px 14px;border-radius:10px;background:#458a8514;color:#2f6b66;font-size:13px;font-weight:600}
+.game-lb-note{margin:0;font-size:11px;color:#8a949e;line-height:1.5}
+.studio.dark .game-lb-banner{background:#458a8520;color:#7fd0c8}
+/* Confetti sits above panels but must never intercept clicks. */
+.confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:200}

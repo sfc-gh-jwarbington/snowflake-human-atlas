@@ -36,6 +36,51 @@ export const DIFFICULTY_HINTS: Record<Difficulty, number> = {
   elementary: 3, middle: 2, high: 1, college: 0, medical: 0,
 };
 
+/** Seconds removed from the round clock for each incorrect body-part click. */
+export const WRONG_PENALTY_SECONDS = 5;
+
+/**
+ * How many escalating hints a player earns from wrong clicks, by difficulty.
+ * Easier levels forgive more, so they unlock the full ladder; harder levels
+ * only ever reach the first rung.
+ */
+export const DIFFICULTY_WRONG_HINTS: Record<Difficulty, number> = {
+  elementary: 4, middle: 3, high: 2, college: 1, medical: 1,
+};
+
+export type HintTier = {
+  kind: 'system-flash'|'location'|'isolate'|'reveal';
+  text: string;
+  /** System to flash in the layers panel, when the tier calls for it. */
+  system?: SystemId;
+};
+
+/**
+ * The escalating hint ladder for a question. Each wrong click advances one
+ * rung, capped by DIFFICULTY_WRONG_HINTS. Tiers that cannot apply to a given
+ * question (e.g. no known system) are omitted so the ladder never stalls.
+ */
+export function hintTiers(q: Question): HintTier[] {
+  const tiers: HintTier[] = [];
+  const sys = q.targetSystem ? SYSTEMS.find(s => s.id === q.targetSystem) : undefined;
+
+  if (sys) {
+    tiers.push({ kind: 'system-flash', text: `Look in the ${sys.name} system.`, system: sys.id });
+  }
+  if (q.hint) {
+    tiers.push({ kind: 'location', text: q.hint });
+  }
+  if (sys) {
+    tiers.push({ kind: 'isolate', text: `Isolating the ${sys.name} system for you.`, system: sys.id });
+  }
+  tiers.push({
+    kind: 'reveal',
+    text: `It's called the ${q.targetConceptName}. Click it to continue.`,
+  });
+
+  return tiers;
+}
+
 const FACTS: Record<string, string> = {
   'heart': 'The heart beats about 100,000 times per day, pumping roughly 2,000 gallons of blood through 60,000 miles of blood vessels.',
   'brain': 'The brain uses about 20% of the body\'s oxygen and energy despite being only 2% of total body weight. It contains approximately 86 billion neurons.',
@@ -339,6 +384,7 @@ function generateFindQuestion(atlas: Atlas, concept: Concept, difficulty: Diffic
     prompt: `Find and tap the ${concept.name}`,
     targetConceptName: concept.name,
     targetPartIds: expanded.length > 0 ? expanded : concept.elements,
+    targetSystem: systemForConcept(atlas, concept),
     difficulty,
     hint: getHint(concept.name),
     fact: getFact(concept.name),
@@ -377,6 +423,7 @@ function generateMultipleChoiceQuestion(atlas: Atlas, concept: Concept, difficul
       prompt: `Which structure: "${hasExplanation}"`,
       targetConceptName: concept.name,
       targetPartIds: concept.elements,
+      targetSystem: sys,
       choices,
       correctChoice: choices.indexOf(correctAnswer),
       difficulty,

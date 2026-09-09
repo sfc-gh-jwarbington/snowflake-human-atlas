@@ -1,7 +1,7 @@
 spec:
   containers:
     - name: human-atlas
-      image: /human_atlas_db/public/human_atlas_repo/human-atlas:latest
+      image: /human_atlas_db/public/human_atlas_repo/human-atlas:v3-20260909-125337
       resources:
         requests:
           memory: 256M
