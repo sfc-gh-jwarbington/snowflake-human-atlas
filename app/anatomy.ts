@@ -1,5 +1,5 @@
 export type SystemId = 'cardiovascular'|'endocrine'|'exocrine'|'gastrointestinal'|'integumentary'|'lymphatic'|'muscular'|'nervous'|'reproductive'|'respiratory'|'skeletal'|'urinary';
-export type SubsystemId = 'cv-heart'|'cv-arteries'|'cv-veins'|'nv-central'|'nv-peripheral'|'nv-eye'|'sk-axial'|'sk-appendicular'|'sk-cartilage'|'gi-oral'|'gi-tract'|'gi-accessory';
+export type SubsystemId = 'cv-heart'|'cv-arteries'|'cv-veins'|'nv-central'|'nv-peripheral'|'nv-eye'|'sk-axial'|'sk-appendicular'|'sk-cartilage'|'gi-oral'|'gi-tract'|'gi-accessory'|'mu-head-neck'|'mu-trunk'|'mu-limbs'|'rs-upper'|'rs-lungs';
 /**
  * The 12 organ systems as defined by Cleveland Clinic:
  * https://my.clevelandclinic.org/health/body/human-body-anatomy
@@ -19,8 +19,8 @@ export const SYSTEMS: {id:SystemId;name:string;color:string;description:string}[
  {id:'integumentary',name:'Integumentary',color:'#ba9b7d',description:'Skin, hair, and nails form a protective outer barrier. The integumentary system guards against injury and infection and helps regulate body temperature.'},
 ];
 /**
- * Sub-systems for the four systems where sub-division genuinely aids visual
- * isolation. Systems not listed here render as a single row.
+ * Sub-systems for systems where sub-division aids visual isolation.
+ * Systems not listed here render as a single row.
  */
 export const SUBSYSTEMS: {id:SubsystemId;parent:SystemId;name:string;description:string}[] = [
  {id:'cv-heart',parent:'cardiovascular',name:'Heart',description:'The four chambers, their valves, and the muscular wall of the heart.'},
@@ -35,6 +35,11 @@ export const SUBSYSTEMS: {id:SubsystemId;parent:SystemId;name:string;description
  {id:'gi-oral',parent:'gastrointestinal',name:'Oral cavity',description:'The mouth, tongue, teeth, gums, and palate, where digestion begins.'},
  {id:'gi-tract',parent:'gastrointestinal',name:'Digestive tract',description:'The continuous passage from esophagus and stomach through the intestines to the rectum.'},
  {id:'gi-accessory',parent:'gastrointestinal',name:'Accessory organs',description:'The liver, pancreas, gallbladder, and spleen, which support digestion without carrying food.'},
+ {id:'mu-head-neck',parent:'muscular',name:'Head and neck',description:'Muscles of the face, extraocular group, mastication, larynx, and neck.'},
+ {id:'mu-trunk',parent:'muscular',name:'Trunk',description:'Muscles of the chest, back, abdomen, diaphragm, and pelvic floor.'},
+ {id:'mu-limbs',parent:'muscular',name:'Limbs',description:'Muscles of the shoulder girdle, arm, hand, pelvis, and lower limb.'},
+ {id:'rs-upper',parent:'respiratory',name:'Upper airway',description:'The nose, pharynx, larynx, and trachea that conduct air toward the lungs.'},
+ {id:'rs-lungs',parent:'respiratory',name:'Lungs and bronchi',description:'The main bronchi and the bronchial trees that fill each lung.'},
 ];
 /** Sub-systems belonging to a given parent system, in registry order. */
 export function subsystemsOf(system:SystemId){return SUBSYSTEMS.filter(s=>s.parent===system);}

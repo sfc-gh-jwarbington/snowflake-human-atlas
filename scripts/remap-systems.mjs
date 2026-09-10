@@ -1,6 +1,6 @@
 /**
  * Remap the atlas onto Cleveland Clinic's 12 canonical body systems and assign
- * sub-systems for the four systems where sub-division aids isolation.
+ * sub-systems for systems where sub-division aids isolation.
  *
  * Source taxonomy:
  *   https://my.clevelandclinic.org/health/body/human-body-anatomy
@@ -159,6 +159,14 @@ const GI_ACCESSORY = /\b(liver|hepatic|pancrea|gallbladder|bile|biliary|cystic d
 const GI_TRACT = /\b(stomach|gastric|esophag|oesophag|cardia|pylor|intestin|duoden|jejun|ileum|ileal|ileo|colon|colic|cecum|caecum|appendix|rectum|rectal|anal|anus|sigmoid|flexure|haustra|taenia|omentum|mesenter)/;
 const GI_ORAL = /\b(tongue|tooth|teeth|molar|incisor|canine|premolar|gingiva|palate|palatine|oral|lip|cheek|uvula|mouth|pharyn)/;
 
+/** Extraocular + mastication + hyoid/laryngeal + named neck muscles. */
+const MU_HEAD_NECK = /\b(sternocleidomastoid|scalenus|longus colli|longus capitis|platysma|masseter|temporalis|pterygoid|digastric|stylohyoid|mylohyoid|geniohyoid|omohyoid|sternohyoid|thyrohyoid|sternothyroid|cricothyroid|arytenoid|vocalis|thyroarytenoid|cricoarytenoid|levator palpebrae|tendinous ring|trochlea of|(superior|inferior|medial|lateral) rectus|(superior|inferior) oblique|orbicularis|zygomaticus|risorius|frontalis|occipito|mentalis|buccinator|splenius|rectus capitis|obliquus capitis|nasalis|procerus|corrugator|uvular)/;
+/** Chest, back, abdomen, diaphragm, pelvic floor. Limb muscles fall through. */
+const MU_TRUNK = /\b(pectoralis|rectus abdominis|external oblique|internal oblique|transversus|diaphragm|intercostal|trapezius|latissimus|rhomboid|serratus|quadratus lumborum|multifidus|spinalis|iliocostalis|longissimus|semispinalis|linea alba|perineal|levator ani|tendinous arch|coccygeus|sphincter|pyramidalis|erector|rotator|interspinal|intertransvers|thoracic rotator|obliquus (internus|externus)|cremaster)/;
+
+/** Conducting airway vs lung parenchyma / bronchial tree. */
+const RS_LUNGS = /\b(lung|bronchus|bronchi|bronchial|bronchopulmonary|alveol|lingular|pulmonary segment)/;
+
 /** Returns a SubsystemId or null when the parent system isn't sub-divided. */
 function assignSubsystem(name, system) {
   switch (system) {
@@ -195,6 +203,15 @@ function assignSubsystem(name, system) {
       if (re(name, GI_ORAL)) return 'gi-oral';
       if (re(name, GI_TRACT)) return 'gi-tract';
       return 'gi-tract';
+
+    case 'muscular':
+      if (re(name, MU_HEAD_NECK)) return 'mu-head-neck';
+      if (re(name, MU_TRUNK)) return 'mu-trunk';
+      return 'mu-limbs';
+
+    case 'respiratory':
+      if (re(name, RS_LUNGS)) return 'rs-lungs';
+      return 'rs-upper';
 
     default:
       return null;

@@ -4,7 +4,7 @@ These parts did not match an explicit rule in `scripts/remap-systems.mjs` and
 were placed by a fallback. They are fully visible and clickable in the app, but
 are worth reviewing and renaming or reassigning.
 
-Generated: 2026-09-09
+Generated: 2026-09-10
 Total parts affected: 12 (10 distinct names)
 
 | Part name | Old system | Assigned to | Instances |
