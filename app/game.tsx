@@ -3,7 +3,7 @@ import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
 import {Check,Crown,Lightbulb,Trophy,X,Zap} from 'lucide-react';
 import {type Atlas} from './anatomy';
-import {type Difficulty,type Question,DIFFICULTY_LABELS,DIFFICULTY_MULTIPLIER,DIFFICULTY_TIME,DIFFICULTY_HINTS,DIFFICULTY_WRONG_HINTS,WRONG_PENALTY_SECONDS,type HintTier,hintTiers,generateQuiz,scoreQuestion} from './game-questions';
+import {type Difficulty,type Question,DIFFICULTY_LABELS,DIFFICULTY_TIME,DIFFICULTY_HINTS,DIFFICULTY_WRONG_HINTS,WRONG_PENALTY_SECONDS,type HintTier,hintTiers,generateQuiz,scoreQuestion} from './game-questions';
 import {type ScoreEntry,saveScore,getTopToday,getTopAllTime,initLeaderboard,isRemoteAvailable} from './game-store';
 import {burst,celebrate} from './confetti';
 import * as sfx from './sounds';
@@ -32,6 +32,7 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset,onFlashS
   const [boardLoading,setBoardLoading]=useState(false);
   const [madeBoard,setMadeBoard]=useState(false);
   const [lbNonce,setLbNonce]=useState(0);
+  const [lastRound,setLastRound]=useState<string[]>([]);
   const timerRef=useRef<ReturnType<typeof setInterval>|null>(null);
   const startTimeRef=useRef(0);
 
@@ -92,7 +93,8 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset,onFlashS
   },[phase,tab,lbNonce]);
 
   const startGame=()=>{
-    const quiz=generateQuiz(atlas,difficulty);
+    const quiz=generateQuiz(atlas,difficulty,lastRound);
+    setLastRound(quiz.map(q=>q.targetConceptName));
     setQuestions(quiz);setQi(0);setScores([]);setAttempts(0);setAnswered(false);setFeedback(null);setSaved(false);setShowHint(false);setHintsUsed(0);setEarnedTier(-1);
     setPhase('playing');
     sfx.gameStart();
@@ -142,7 +144,7 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset,onFlashS
     if(!onSelect)return;
     if(q.type==='find'||q.type==='system-id'){
       if(q.targetPartIds.includes(onSelect)){
-        const pts=scoreQuestion(timer,maxTime,attempts,difficulty);
+        const pts=scoreQuestion(timer,maxTime,attempts);
         setScores(s=>[...s,pts]);setFeedback('correct');setAnswered(true);stopTimer();
         onHighlight(q.targetPartIds);
       } else {
@@ -154,7 +156,7 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset,onFlashS
   const answerMC=(index:number)=>{
     if(answered||!q)return;
     if(index===q.correctChoice){
-      const pts=scoreQuestion(timer,maxTime,attempts,difficulty);
+      const pts=scoreQuestion(timer,maxTime,attempts);
       setScores(s=>[...s,pts]);setFeedback('correct');setAnswered(true);stopTimer();
       if(q.targetPartIds.length)onHighlight(q.targetPartIds);
     } else {
@@ -208,7 +210,7 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset,onFlashS
             {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map(d=>(
               <Button key={d} variant="ghost" className={`game-diff-btn ${difficulty===d?'active':''}`} onClick={()=>{sfx.uiSelect();setDifficulty(d);}}>
                 <span>{DIFFICULTY_LABELS[d]}</span>
-                <span className="game-diff-meta">{DIFFICULTY_TIME[d]}s · {DIFFICULTY_MULTIPLIER[d]}x{DIFFICULTY_HINTS[d]>0?` · ${DIFFICULTY_HINTS[d]} hints`:''}</span>
+                <span className="game-diff-meta">{DIFFICULTY_TIME[d]}s{DIFFICULTY_HINTS[d]>0?` · ${DIFFICULTY_HINTS[d]} hints`:''}</span>
               </Button>
             ))}
           </div>
@@ -299,7 +301,7 @@ export default function Game({atlas,onSelect,onExit,onHighlight,onReset,onFlashS
         <div className="game-big-score">{totalScore}</div>
         <div className="game-results-meta">
           <span>{correctCount}/{questions.length} correct</span>
-          <Badge variant="outline">{DIFFICULTY_LABELS[difficulty]} ({DIFFICULTY_MULTIPLIER[difficulty]}x)</Badge>
+          <Badge variant="outline">{DIFFICULTY_LABELS[difficulty]}</Badge>
         </div>
       </div>
       <div className="game-name-entry">

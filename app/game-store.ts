@@ -1,4 +1,4 @@
-import {type Difficulty} from './game-questions';
+import {type Difficulty, LEGACY_DIFFICULTY_MULTIPLIER} from './game-questions';
 
 export interface ScoreEntry {
   name: string;
@@ -86,16 +86,32 @@ async function postRemote(entry: ScoreEntry): Promise<boolean> {
 /**
  * One-time upload of any scores that were recorded before the shared
  * leaderboard existed, so upgrading doesn't appear to lose history.
+ *
+ * Legacy scores were multiplied by a per-difficulty factor (up to 5x for
+ * Medical School) that has since been removed. They are divided back down here
+ * so an inflated old score can't permanently top the shared board.
  */
 async function migrateLocalScores() {
   try {
     if (localStorage.getItem(MIGRATED_KEY) === '1') return;
     const local = loadLocal();
     if (local.length === 0) { localStorage.setItem(MIGRATED_KEY, '1'); return; }
-    const results = await Promise.all(local.map(e => postRemote(e)));
+    const normalized = local.map(normalizeLegacyScore);
+    const results = await Promise.all(normalized.map(e => postRemote(e)));
     // Only mark done if every row made it, otherwise retry on the next load.
-    if (results.every(Boolean)) localStorage.setItem(MIGRATED_KEY, '1');
+    if (results.every(Boolean)) {
+      localStorage.setItem(MIGRATED_KEY, '1');
+      // Keep the local cache consistent with what we just uploaded.
+      saveLocal(normalized.sort((a, b) => b.score - a.score));
+    }
   } catch { /* ignore */ }
+}
+
+/** Divide out the retired difficulty multiplier from a pre-existing score. */
+function normalizeLegacyScore(e: ScoreEntry): ScoreEntry {
+  const factor = LEGACY_DIFFICULTY_MULTIPLIER[e.difficulty] ?? 1;
+  if (factor === 1) return e;
+  return { ...e, score: Math.max(0, Math.round(e.score / factor)) };
 }
 
 // ---------------------------------------------------------------------------

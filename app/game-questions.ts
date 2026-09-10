@@ -24,7 +24,12 @@ export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   medical: 'Medical School',
 };
 
-export const DIFFICULTY_MULTIPLIER: Record<Difficulty, number> = {
+/**
+ * Retired score multipliers, kept only to normalize scores recorded before
+ * multipliers were removed. Not used for new scoring.
+ * @deprecated
+ */
+export const LEGACY_DIFFICULTY_MULTIPLIER: Record<Difficulty, number> = {
   elementary: 1, middle: 1.5, high: 2, college: 3, medical: 5,
 };
 
@@ -35,6 +40,64 @@ export const DIFFICULTY_TIME: Record<Difficulty, number> = {
 export const DIFFICULTY_HINTS: Record<Difficulty, number> = {
   elementary: 3, middle: 2, high: 1, college: 0, medical: 0,
 };
+
+/**
+ * Question-type mix per difficulty.
+ *
+ * `system-id` ("tap any structure in the X system") is trivially easy: with
+ * 1,061 cardiovascular parts, almost any click succeeds. It is therefore
+ * restricted to the two easiest levels and removed entirely from High School
+ * upward, which is what previously let a Medical School round be easier than
+ * an Elementary one.
+ */
+export const DIFFICULTY_TYPES: Record<Difficulty, QuestionType[]> = {
+  elementary: ['find', 'find', 'multiple-choice', 'system-id', 'system-id'],
+  middle:     ['find', 'find', 'multiple-choice', 'multiple-choice', 'system-id'],
+  high:       ['find', 'find', 'find', 'multiple-choice', 'multiple-choice'],
+  college:    ['find', 'find', 'find', 'multiple-choice', 'multiple-choice'],
+  medical:    ['find', 'find', 'find', 'multiple-choice', 'multiple-choice'],
+};
+
+/** Difficulties where a "which system does X belong to?" question is banned. */
+const NO_SYSTEM_TRIVIA: Difficulty[] = ['college', 'medical'];
+
+/**
+ * Words in a structure's name that give away its system outright. Asking
+ * "which system does the left renal artery belong to?" is not a test of
+ * knowledge when the answer is a word in the question.
+ */
+const SYSTEM_GIVEAWAYS: Record<string, SystemId> = {
+  artery: 'cardiovascular', arteries: 'cardiovascular', arterial: 'cardiovascular',
+  aorta: 'cardiovascular', aortic: 'cardiovascular', vein: 'cardiovascular',
+  venous: 'cardiovascular', vena: 'cardiovascular', heart: 'cardiovascular',
+  cardiac: 'cardiovascular', coronary: 'cardiovascular',
+  nerve: 'nervous', nerves: 'nervous', nervous: 'nervous', brain: 'nervous',
+  cerebral: 'nervous', spinal: 'nervous', ganglion: 'nervous', plexus: 'nervous',
+  bone: 'skeletal', vertebra: 'skeletal', vertebral: 'skeletal', rib: 'skeletal',
+  skull: 'skeletal', cartilage: 'skeletal', ligament: 'skeletal',
+  muscle: 'muscular', tendon: 'muscular',
+  gland: 'endocrine',
+  lymph: 'lymphatic', lymphatic: 'lymphatic',
+  renal: 'urinary', kidney: 'urinary', bladder: 'urinary', ureter: 'urinary',
+  lung: 'respiratory', bronchial: 'respiratory', bronchus: 'respiratory',
+  pulmonary: 'respiratory', trachea: 'respiratory',
+  gastric: 'gastrointestinal', intestinal: 'gastrointestinal', hepatic: 'gastrointestinal',
+};
+
+/**
+ * True when the system is derivable from the structure's own name, either by
+ * a giveaway word or by direct token overlap with the system's display name.
+ */
+export function answerLeaksFromName(conceptName: string, system: SystemId | undefined, systemName: string): boolean {
+  if (!system) return false;
+  const tokens = conceptName.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  for (const t of tokens) {
+    if (SYSTEM_GIVEAWAYS[t] === system) return true;
+  }
+  // Direct overlap, e.g. "nervous" appearing in a nervous-system structure.
+  const sysTokens = systemName.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 4);
+  return sysTokens.some(w => tokens.includes(w));
+}
 
 /** Seconds removed from the round clock for each incorrect body-part click. */
 export const WRONG_PENALTY_SECONDS = 5;
@@ -329,30 +392,57 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+interface AtlasIndex {
+  exact: Map<string, Concept>;
+  fuzzy: { lower: string; concept: Concept }[];
+  parts: Map<string, Atlas['parts'][number]>;
+}
+
+const indexes = new WeakMap<Atlas, AtlasIndex>();
+
+function indexOf(atlas: Atlas): AtlasIndex {
+  const cached = indexes.get(atlas);
+  if (cached) return cached;
+  const exact = new Map<string, Concept>();
+  const fuzzy: { lower: string; concept: Concept }[] = [];
+  for (const c of atlas.concepts) {
+    const lower = c.name.toLowerCase();
+    exact.set(lower, c);
+    if (c.elements.length > 0 && c.elements.length <= 10) fuzzy.push({ lower, concept: c });
+  }
+  const parts = new Map(atlas.parts.map(p => [p.id, p]));
+  const idx = { exact, fuzzy, parts };
+  indexes.set(atlas, idx);
+  return idx;
+}
+
 function findConcept(atlas: Atlas, name: string): Concept | undefined {
+  const { exact, fuzzy } = indexOf(atlas);
   const lower = name.toLowerCase();
-  return atlas.concepts.find(c => c.name.toLowerCase() === lower)
-    ?? atlas.concepts.find(c => c.name.toLowerCase().includes(lower) && c.elements.length > 0 && c.elements.length <= 10);
+  return exact.get(lower)
+    ?? fuzzy.find(c => c.lower.includes(lower))?.concept;
 }
 
 function systemForConcept(atlas: Atlas, concept: Concept): SystemId | undefined {
   const partId = concept.elements[0];
   if (!partId) return undefined;
-  return atlas.parts.find(p => p.id === partId)?.system;
+  return indexOf(atlas).parts.get(partId)?.system;
 }
 
 function expandPartIds(atlas: Atlas, concept: Concept): string[] {
+  const { parts } = indexOf(atlas);
   const ids = new Set(concept.elements);
-  const systems = new Set(concept.elements.map(id => atlas.parts.find(p => p.id === id)?.system).filter(Boolean));
+  const systems = new Set(concept.elements.map(id => parts.get(id)?.system).filter(Boolean));
   if (systems.size > 1) return [...ids];
+  const first = concept.name.toLowerCase().split(' ')[0];
+  if (!first) return [...ids];
+  const owned = new Set(concept.elements);
   for (const el of concept.elements) {
-    const part = atlas.parts.find(p => p.id === el);
-    if (!part) continue;
-    const nearby = atlas.parts.filter(p =>
-      p.id !== el && concept.elements.includes(p.id) === false &&
-      p.name.toLowerCase().includes(concept.name.toLowerCase().split(' ')[0])
-    );
-    nearby.forEach(p => ids.add(p.id));
+    if (!parts.get(el)) continue;
+    for (const p of atlas.parts) {
+      if (owned.has(p.id)) continue;
+      if (p.name.toLowerCase().includes(first)) ids.add(p.id);
+    }
   }
   return [...ids];
 }
@@ -412,7 +502,13 @@ function generateMultipleChoiceQuestion(atlas: Atlas, concept: Concept, difficul
   const sysInfo = SYSTEMS.find(s => s.id === sys);
   const hasExplanation = EXPLANATIONS[concept.name.toLowerCase()];
 
-  if (hasExplanation && Math.random() > 0.4) {
+  // The "which system?" variant is banned at the top two levels, and is also
+  // pointless whenever the structure's own name gives the system away.
+  const systemTriviaAllowed =
+    !NO_SYSTEM_TRIVIA.includes(difficulty) &&
+    !answerLeaksFromName(concept.name, sys, sysInfo?.name ?? '');
+
+  if (hasExplanation && (!systemTriviaAllowed || Math.random() > 0.4)) {
     const correctAnswer = concept.name;
     const otherConcepts = shuffle(
       atlas.concepts.filter(c => c.name !== concept.name && c.elements.length > 0 && c.elements.length < 20)
@@ -432,6 +528,9 @@ function generateMultipleChoiceQuestion(atlas: Atlas, concept: Concept, difficul
     };
   }
 
+  // No usable explanation and system trivia is barred: fall back to a find.
+  if (!systemTriviaAllowed) return generateFindQuestion(atlas, concept, difficulty);
+
   const correctAnswer = sysInfo?.name ?? 'Unknown';
   const otherSystems = shuffle(
     SYSTEMS.filter(s => s.id !== sys && atlas.parts.some(p => p.system === s.id))
@@ -450,33 +549,109 @@ function generateMultipleChoiceQuestion(atlas: Atlas, concept: Concept, difficul
   };
 }
 
-export function generateQuiz(atlas: Atlas, difficulty: Difficulty): Question[] {
+/** The sub-system a concept's parts belong to, when its system is subdivided. */
+function subsystemForConcept(atlas: Atlas, concept: Concept): string | undefined {
+  const { parts } = indexOf(atlas);
+  for (const id of concept.elements) {
+    const part = parts.get(id);
+    if (part?.subsystem) return part.subsystem;
+  }
+  return undefined;
+}
+
+/**
+ * Pick `n` concepts spread across different systems.
+ *
+ * Cardiovascular alone holds ~1,061 of 2,234 parts, so a naive shuffle reliably
+ * produced rounds where four of five questions were arteries. This walks the
+ * shuffled pool preferring an unused system, falls back to an unused
+ * sub-system, and only then allows a repeat -- and never places two questions
+ * from the same system back to back.
+ */
+function pickDiverse(atlas: Atlas, pool: Concept[], n: number): Concept[] {
+  const chosen: Concept[] = [];
+  const usedSystems = new Set<string>();
+  const usedSubs = new Set<string>();
+  const remaining = [...pool];
+
+  const keyOf = (c: Concept) => systemForConcept(atlas, c) ?? 'unknown';
+
+  // Pass 1: strictly one concept per system.
+  for (let i = 0; i < remaining.length && chosen.length < n; i++) {
+    const sys = keyOf(remaining[i]);
+    if (usedSystems.has(sys)) continue;
+    const sub = subsystemForConcept(atlas, remaining[i]);
+    usedSystems.add(sys);
+    if (sub) usedSubs.add(sub);
+    chosen.push(remaining[i]);
+    remaining.splice(i, 1);
+    i--;
+  }
+
+  // Pass 2: allow a system repeat but require a fresh sub-system, so a round
+  // can hold one artery and one vein question without feeling repetitive.
+  for (let i = 0; i < remaining.length && chosen.length < n; i++) {
+    const sub = subsystemForConcept(atlas, remaining[i]);
+    if (sub && usedSubs.has(sub)) continue;
+    if (sub) usedSubs.add(sub);
+    chosen.push(remaining[i]);
+    remaining.splice(i, 1);
+    i--;
+  }
+
+  // Pass 3: pool exhausted of variety -- take whatever is left.
+  while (chosen.length < n && remaining.length > 0) chosen.push(remaining.shift()!);
+
+  // Reorder so no two adjacent questions share a system.
+  for (let i = 1; i < chosen.length; i++) {
+    if (keyOf(chosen[i]) !== keyOf(chosen[i - 1])) continue;
+    const swap = chosen.findIndex((c, j) =>
+      j > i &&
+      keyOf(c) !== keyOf(chosen[i - 1]) &&
+      (j + 1 >= chosen.length || keyOf(chosen[j + 1]) !== keyOf(chosen[i]))
+    );
+    if (swap > -1) [chosen[i], chosen[swap]] = [chosen[swap], chosen[i]];
+  }
+
+  return chosen;
+}
+
+export function generateQuiz(atlas: Atlas, difficulty: Difficulty, exclude: string[] = []): Question[] {
   const pool = POOLS[difficulty];
+  const skip = new Set(exclude);
   const matched = shuffle(
-    pool.map(name => findConcept(atlas, name)).filter((c): c is Concept => !!c && c.elements.length > 0)
+    pool.map(name => findConcept(atlas, name))
+        .filter((c): c is Concept => !!c && c.elements.length > 0 && !skip.has(c.name))
   );
 
   if (matched.length < 5) {
     const extra = shuffle(
-      atlas.concepts.filter(c => c.elements.length > 0 && c.elements.length < 20 && !matched.includes(c))
+      atlas.concepts.filter(c => c.elements.length > 0 && c.elements.length < 20 && !matched.includes(c) && !skip.has(c.name))
     ).slice(0, 5 - matched.length);
     matched.push(...extra);
   }
 
-  const selected = matched.slice(0, 5);
-  const types: QuestionType[] = shuffle(['find', 'find', 'multiple-choice', 'multiple-choice', 'system-id']);
+  const selected = pickDiverse(atlas, matched, 5);
+  // Type mix is gated by difficulty, then shuffled so type doesn't correlate
+  // with position or system.
+  const types = shuffle([...DIFFICULTY_TYPES[difficulty]]);
 
   return selected.map((concept, i) => {
-    const t = types[i];
+    const t = types[i] ?? 'find';
     if (t === 'find') return generateFindQuestion(atlas, concept, difficulty);
     if (t === 'system-id') return generateSystemIdQuestion(atlas, concept, difficulty);
     return generateMultipleChoiceQuestion(atlas, concept, difficulty);
   });
 }
 
-export function scoreQuestion(timeRemaining: number, maxTime: number, attempts: number, difficulty: Difficulty): number {
+/**
+ * Score is difficulty-independent: harder levels are already harder because the
+ * clock is shorter and hints are fewer, so a multiplier double-counted that and
+ * made cross-difficulty leaderboard comparison meaningless.
+ */
+export function scoreQuestion(timeRemaining: number, maxTime: number, attempts: number): number {
   const base = 100;
   const timeBonus = Math.max(0, Math.floor((timeRemaining / maxTime) * 100));
   const penalty = (attempts - 1) * 25;
-  return Math.max(0, Math.round((base + timeBonus - penalty) * DIFFICULTY_MULTIPLIER[difficulty]));
+  return Math.max(0, Math.round(base + timeBonus - penalty));
 }
